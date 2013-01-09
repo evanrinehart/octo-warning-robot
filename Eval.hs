@@ -9,21 +9,22 @@ import Control.Concurrent.Chan
 import Control.Exception
 import Control.Monad
 
+import Value
 import Expr
 import Object
 import Global
 import Error
 
 eval :: Global -> Object -> Env -> Expr -> IO Value
-eval _ _ _ (SymExpr s) = return (Symbol s)
-eval _ _ _ (NumExpr n) = return (Number n)
-eval _ _ e (Variable s) = case M.lookup s e of
-  Nothing -> throw FreeVariableError
-  Just v -> return v
-eval g o e (Cons exprs) = do
-  vs <- forM exprs (eval g o e)
-  return (Tuple vs)
-
+eval g o e expr = case expr of
+  (SymExpr s) -> return (Symbol s)
+  (NumExpr n) -> return (Number n)
+  (Variable s) -> case M.lookup s e of
+    Nothing -> throw FreeVariableError
+    Just v -> return v
+  (Cons exprs) -> do
+    vs <- forM exprs (eval g o e)
+    return (Tuple vs)
 
 {-
   SymExpr String |
