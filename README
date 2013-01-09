@@ -1,252 +1,38 @@
-number
+exprs:
 symbol
+number
+cons
+case
+variable
+apply
+letrec
+do
+send
+request
+load
+store
+halt
+error
+throw
+new
+(block/unblock?)
+
+runtime errors:
+apply noncase
+var nonsymbol
+free variable
+sending nondata
+requesting nondata
+response nondata
+evaluated "error"
+arithmetic error ([/ $foo 0], [% $f00 0], [^ 0 0])
+
+syntax:
+a 0 () case{} $v [] letrec(){} do{} send{,} request{,,} load{}
+store{,} halt{} error{} throw{,} new{,}
+
+data:
+symbol
+number
 tuple
-case
-
-case
-  9 ->
-  sym ->
-  $x ->
-  _ ->
-  (p1 p2) ->
-
-cond = case
-  false -> case
-    (_, $y) -> $y
-  true -> case
-    ($x, _) -> $x
-
-cond (3 < 1) die (launch 9)
-
-message passing
-objects run in separate threads and
-communicate with message passing.
-an object blocks until the message is serviced and
-the response arrives.
-an object that is waiting like this cant service
-requests itself.
-this means objects will deadlock if they call each other
-it is possible to use an intermediate object to make
-this asynchronous.
-
-
-a repl object can act as an interactive interpreter
-
-
-
-====
-
-data
-  symbol
-  number
-  tuple
-  closure
-
-expr
-  symbol   -> symbol
-  number   -> number
-  cons     -> tuple
-  case     -> closure
-  variable -> data
-  apply    -> effects + data
-  mathop   -> number/ordering
-  send     -> effects + data
-  store    -> effects
-  load     -> data
-
-block syntax
-{$x = [e1 0]
-;$y = [e2 $x]
-;     [e3 $y]}
-
-=== [case(($x [case(($y [e3 $y])) $x]) [e1 0]]
-
-syntax
-123
-abc
-(cons cell)
-$variable
-(pattern $match _)
-[e1 e2]
-[+ e1 e2]
-send{name, data}
-self{name}
-store{name, data}
-
-how about a type check
-a case has a type consisting of pairs of the types of each pattern
-with the type of that patterns body.
-an application is well typed if the type of the argument expression
-matches the type of at least one of the cases, in which case the
-type of the whole application is the type of the body.
-(except if theres more than one body type for a given pattern type.
-you can avoid this by requiring all the body types to be the same for
-a given pattern type)
-the type of a cons is a tuple of the types of each element
-primitive types are number, symbol, tuple[types], and case type
-object fields can be written in unpredictable ways, some sort of
-field type map would work
-objects defined in the language have types by virtue of their case
-body, but not by their fields. system objects would need to have
-their types hardcoded.
-RUNTIME TYPE CHECKING IT IS
-
-$error = [case((yes no)) maybe]
-$empty = (() ())
-$enqueue = case(($x
- case((($l $r) (($x $l) $r)))
-))
-$dequeue = case(
-  ((() ()) $error)
-  (($l ()) [$dequeue (() [$reverse $l])])
-  (($l ($x $r)) ($x ($l $r)))
-)
-
-to get recursive definitions without recursive bindings you can use fix
-[$fix case(($f expr($f)))] will evaluate with expr where $f is the
-case expression. you can use it to loop.
-
-$fix is definable without recursive bindings but its a huge expression
-λf.(λx.f (x x)) (λx.f (x x))
-
-$fix = case(($f
-  [
-    case(($x [$f [$x $x]]))
-    case(($x [$f [$x $x]]))
-  ]
-))
-
-[[$fix $f] 9]
-[[c($f) c($f)] 9]
-[[$f [c($f) c($f)]] 9]
-[[$f [$f [c($f) c($f)]] 9]
-so we need a lazy apply
-
-$fix = case (($f
-  [
-    case(($x lazy[$f [$x $x]]))
-    case(($x lazy[$f [$x $x]]))
-  ]
-))
-
-becoming
-[[$fix $f] 9]
-[[c($f) c($f)] 9]
-[[$f lazy[c($f) c($f)]] 9]
-[fcase(loop) 9]
-
-$f could be
-case(($f
-  case(
-    (9 [$f 8])
-    (8 [$f 7])
-    (7      0)
-  )
-))
-
-so you either need reqursive let or a lazy apply (for y combinator)
-to get the ability to write recursive algorithms.
-the syntax
-{$x = e1($x)
-;$y = e2($y)
-;     e3($x,$y)}
-...
-
-
-you dont need lazy apply to write a strict fixed point combinator
-
-$fix = case (($f
-  [
-    case(($x [$f case((_ [$x $x]))]))
-    case(($x [$f case((_ [$x $x]))]))
-  ]
-))
-
-but it requires recursive algorithms to pass a dummy value
-to the continuation
-
-a recursive binding mechanism would be better
-
-
-
-
-alright so
-
-case(expr){p1 -> e1; p2 -> e2}
-originally was sugar for [case{} expr]
-
-we need a recursive binding mechanism because Y is clunky
-
-letrec([$f 9]){
-  $f = case{
-    0 -> 0;
-    $x -> [$f [- $x 1]]
-  }
-}
-
-[
-  case{$f -> [$f 9]}
-  [$Y case{$f -> case{0 -> 0; $x -> [$f [- $x 1]]}}]
-]
-
-
-
-
-
-final draft, except for block/unblock async exceptions
-
-expressions:
-pure:
-  symbol
-  number
-  case
-  variable
-basic eval:
-  cons
-  apply
-  maths
-  letrec
-  do
-object:
-  send
-  request
-  load
-  store
-  error
-  throw
-  new
-  halt
-
-values:
-  symbol   (data)
-  number   (data)
-  tuple    (data)
-  closure  (nondata)
-
-objects...
-objects are threads with storage fields and a 'event handler' case expr.
-objects have a unique name which is equivalent to the name of the global
-object slot which it resides. names are any 'data'
-objects may either be idle, processing, or blocked waiting for a request.
-when one object sends or makes a request the message is placed in a fifo
-queue until the object can process it, which is one at a time.
-load and store commands are used to read and write the objects local env.
-the error expression causes processing to stop and the calling object
-(if a request was made) either crashes or enters its error handler for
-the request. error will not cause the object to die.
-throw is used to asynchronously signal an object to cancel its current 
-processing, if any, and enter an error handler, or crash if none exists.
-new spawns a new object with a given name and case. if an object already
-exists with that name, you get undefined behavior!
-
-some objects are not defined (or definabled) in the language and represent
-IO or time functions provided by the operating system.
-
-to implement objects you need:
-a fifo for incoming messages
-an mvar to receive responses during a request
-a finalizer to remove itself from the global object directory
-local storage directory
-a catch to catch eval errors and return them to the caller
-
-
+closure
