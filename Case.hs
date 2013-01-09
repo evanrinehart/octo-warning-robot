@@ -2,9 +2,10 @@ module Case where
 
 data Case a = Case [(Pattern, a)] deriving (Show)
 data Pattern =
-  Anything String |
-  DontCare |
-  TuplePattern [Pattern] |
-  SymPattern String |
-  NumPattern Integer deriving (Show)
+  PatDontCare |
+  PatVar String |
+  PatSym String |
+  PatNum Integer |
+  PatTuple [Pattern]
+    deriving (Show)
 
