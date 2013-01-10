@@ -5,8 +5,8 @@ import Data.Typeable
 import Control.Exception
 
 data Error =
-  PatternMatchError |
   ArithMismatchError |
+  PatternMatchError |
   DivZeroError |
   PowZeroError |
   ApplyMismatchError |
