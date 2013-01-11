@@ -6,9 +6,8 @@ import Control.Exception
 
 data Error =
   ArithMismatchError |
-  PatternMatchError |
   DivZeroError |
-  PowZeroError |
+  PatternMatchError |
   ApplyMismatchError |
   NonClosureError |
   NonDataError |
