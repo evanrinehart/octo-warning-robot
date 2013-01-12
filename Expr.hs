@@ -1,5 +1,7 @@
 module Expr where
 
+import Data.Map
+
 import Case
 
 data Expr =
@@ -9,7 +11,7 @@ data Expr =
   Cons [Expr] |
   CaseExpr (Case Expr) |
   Apply Expr Expr |
-  LetRec Expr [(String, Expr)] |
+  LetRec Expr (Map String Expr) |
   Maths MathOp Expr Expr |
   Send Expr Expr |
   Request Expr Expr Expr |

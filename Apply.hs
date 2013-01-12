@@ -17,7 +17,7 @@ apply (Case ((p,expr):cases)) v = case match p v of
 
 match :: Pattern -> Value -> Maybe Env
 match p v = case p of
-  PatVar s -> Just (M.singleton s v)
+  PatVar s -> Just (M.singleton s (Right v))
   PatNum n -> case v of
     Number n' -> if n' == n then Just M.empty else Nothing
     _ -> Nothing

@@ -4,7 +4,7 @@ import Data.Map
 import Expr
 import Case
 
-type Env = Map String Value
+type Env = Map String (Either Expr Value)
 data Value =
   Symbol String |
   Number Integer |

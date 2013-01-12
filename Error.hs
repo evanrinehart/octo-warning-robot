@@ -8,9 +8,8 @@ data Error =
   ArithMismatchError |
   DivZeroError |
   PatternMatchError |
-  ApplyMismatchError |
-  NonClosureError |
-  NonDataError |
+  ApplyNonClosureError |
+  ClosureMessageError |
   SendTargetError |
   FreeVariableError deriving (Show, Typeable)  
 
