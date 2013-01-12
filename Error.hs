@@ -10,12 +10,9 @@ data Error =
   PatternMatchError |
   ApplyNonClosureError |
   ClosureMessageError |
-  SendTargetError |
+  ClosureNameError |
   ObjectNotFoundError |
-  ClosureFieldError |
-  ClosureErrorError |
-  ErrorError |
-  AsyncError |
+  ObjectExistsError |
   FreeVariableError deriving (Show, Typeable)  
 
 instance Exception Error
@@ -27,10 +24,7 @@ errorSymbol e = case e of
   PatternMatchError -> "pattern-match-failed"
   ApplyNonClosureError -> "apply-non-closure"
   ClosureMessageError -> "closure-message"
-  SendTargetError -> "send-to-closure"
   ObjectNotFoundError -> "object-not-found"
+  ObjectExistsError -> "object-exists"
   FreeVariableError -> "undefined-variable"
-  ClosureFieldError -> "closure-field-name"
-  ClosureErrorError -> "closure-as-error"
-  ErrorError -> "error"
-  AsyncError -> "asynchronous-error"
+  ClosureNameError -> "closure-as-name"

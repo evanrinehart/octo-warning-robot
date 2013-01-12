@@ -60,7 +60,7 @@ eval g o env expr = case expr of
   Load e1 e2 -> do
     arg1 <- eval g o env e1
     case arg1 of
-      Closure _ _ -> throw ClosureFieldError
+      Closure _ _ -> throw ClosureNameError
       field -> do
         mo' <- objectLookup o field
         case mo' of
@@ -69,7 +69,7 @@ eval g o env expr = case expr of
   Store e1 e2 -> do
     arg1 <- eval g o env e1
     case arg1 of
-      Closure _ _ -> throw ClosureFieldError
+      Closure _ _ -> throw ClosureNameError
       field -> do
         arg2 <- eval g o env e2
         objectStore o field arg2
@@ -77,21 +77,41 @@ eval g o env expr = case expr of
   Error e1 -> do
     arg <- eval g o env e1
     case arg of
-      Closure _ _ -> throw ClosureErrorError
-      err -> throw ErrorError
+      Closure _ _ -> throw ClosureNameError
+      err -> error "error does not work"
   Throw e1 e2 -> withObject g o env e1 e2
     (\o' v -> do
       thread <- readMVar (tid o')
-      throwTo thread AsyncError
+      --throwTo thread foo
+      error "throw does not work"
       return (Tuple []))
     (throw ObjectNotFoundError)
-  New e1 e2 -> undefined
-  Halt e1 -> undefined
+  New e1 e2 -> do
+    arg2 <- eval g o env e2
+    arg1 <- eval g o env e1
+    o' <- case arg1 of
+      Closure _ _ -> throw ClosureNameError
+      newName -> modifyMVar g $ \m -> do
+        case M.lookup newName m of
+          Nothing -> do
+            o' <- return $ Object {
+              name = newName,
+              response = undefined,
+              fifo = undefined,
+              storage = undefined,
+              tid = undefined
+            }
+            return (M.insert newName o' m, o')
+          Just _ -> throw ObjectExistsError
+    --spawn thread here
+    return (Symbol "object-created")
+  Halt e1 -> error "halt does not work"
+
 
 withObject g o env e1 e2 success failure = do
   arg0 <- eval g o env e1
   case arg0 of
-    Closure _ _ -> throw SendTargetError
+    Closure _ _ -> throw ClosureNameError
     target -> do
       mo' <- lookupGlobal g target
       case mo' of
