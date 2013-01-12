@@ -1,38 +1,51 @@
-exprs:
-symbol
-number
-cons
-case
-variable
-apply
-letrec
-do
-send
-request
-load
-store
-halt
-error
-throw
-new
-(block/unblock?)
+Object Oriented Programming Language
 
-runtime errors:
-apply noncase
-var nonsymbol
-free variable
-sending nondata
-requesting nondata
-response nondata
-evaluated "error"
-arithmetic error ([/ $foo 0], [% $f00 0], [^ 0 0])
+Imagine objects as literally little demons carrying out computational
+tasks and sending messages to each other. Each demon will wait for
+a message, carry out a program to produce a response, and repeat.
+Each demon has a private, infinitely big notebook to write values in and
+read them later if necessary. During the course of a computation he
+might send a message to another object, perhaps waiting for a response
+before continuing. He can also self-destruct or cancel another demons
+computation in progress via an asynchronous signal. Some demons behavior
+upon getting messages is undefined because they represent i/o or time
+in the real world (which does not in general behave in these ideal ways).
+Other demons are limited to basic computations like arithmetic and
+pattern matching, and so they are possible to program. This is the
+true form of "object oriented programming." : )
 
-syntax:
-a 0 () case{} $v [] letrec(){} do{} send{,} request{,,} load{}
-store{,} halt{} error{} throw{,} new{,}
+expressions:
+symbol    symbol
+number    1234
+cons      (a b c)
+case      case{1 -> a; 2 ->b}
+variable  $x
+apply     [$f x]
+          case(x){x -> y; y -> x}
+letrec    letrec($x){$x = $y; $y = 3}
+do        do{$a = [$f x]; $b = [$g $a]; [$g $b]}
+send      send{name, value}
+request   request{name, value}
+          request{name, value, $error-handler}
+load      load{field, default}
+store     store{field, value}
+halt      halt{value}
+error     error{value}
+throw     throw{name, value}
+new       new{name, $message-handler}
+
+objects:
+* independent concurrent processes
+* internal mutable storage
+* global identifier
+* handles messages fifo, one at a time
+* sends messages to other objects, perhaps waiting for response
+* can be asynchronously signaled to cancel the current operation
+* system objects represent real world i/o and time
 
 data:
-symbol
-number
-tuple
-closure
+symbol   non-numeric general value
+number   that is to say integers
+tuple    a vector of other values
+closure  a transformation from values to values
+
