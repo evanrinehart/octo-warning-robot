@@ -12,3 +12,5 @@ type Global = MVar (Map Value Object)
 emptyGlobal :: IO Global
 emptyGlobal = newMVar M.empty
 
+lookupGlobal :: Global -> Value -> IO (Maybe Object)
+lookupGlobal g v = withMVar g (return . M.lookup v)
