@@ -66,8 +66,19 @@ eval g o env expr = case expr of
         case mo' of
           Nothing -> eval g o env e2
           Just v -> return v
-  Store e1 e2 -> undefined
-  Error e1 -> undefined
+  Store e1 e2 -> do
+    arg1 <- eval g o env e1
+    case arg1 of
+      Closure _ _ -> throw ClosureFieldError
+      field -> do
+        arg2 <- eval g o env e2
+        objectStore o field arg2
+        return arg2
+  Error e1 -> do
+    arg <- eval g o env e1
+    case arg of
+      Closure _ _ -> throw ClosureErrorError
+      err -> throw ErrorError
   Throw e1 e2 -> undefined
   New e1 e2 -> undefined
   Halt e1 -> undefined

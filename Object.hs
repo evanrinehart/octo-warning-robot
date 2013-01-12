@@ -20,3 +20,6 @@ data Object = Object {
 
 objectLookup :: Object -> Value -> IO (Maybe Value)
 objectLookup o v = withMVar (storage o) (return . M.lookup v)
+
+objectStore :: Object -> Value -> Value -> IO ()
+objectStore o field v = modifyMVar_ (storage o) (return . M.insert field v)

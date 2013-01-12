@@ -13,6 +13,8 @@ data Error =
   SendTargetError |
   ObjectNotFoundError |
   ClosureFieldError |
+  ClosureErrorError |
+  ErrorError |
   FreeVariableError deriving (Show, Typeable)  
 
 instance Exception Error
@@ -27,4 +29,6 @@ errorSymbol e = case e of
   SendTargetError -> "send-to-closure"
   ObjectNotFoundError -> "object-not-found"
   FreeVariableError -> "undefined-variable"
-  ClosureFieldError -> "closure-field-lookup"
+  ClosureFieldError -> "closure-field-name"
+  ClosureErrorError -> "closure-as-error"
+  ErrorError -> "error"
