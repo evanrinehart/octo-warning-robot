@@ -67,3 +67,5 @@ startObject o react = do
         putStrLn ("thread "++show thread++" ended normally")
         return ()
   putMVar (tid o) thread
+
+

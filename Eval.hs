@@ -85,12 +85,7 @@ eval g o env expr = case expr of
     newName <- eval g o env e1
     when (notClosure clo) (throw HandlerNotClosureError)
     when (isClosure newName) (throw ClosureNameError)
-    o' <- modifyMVar g $ \m -> case M.lookup newName m of
-      Nothing -> do
-        o' <- newEmptyObject newName
-        return (M.insert newName o' m, o')
-      Just _ -> throw ObjectExistsError
-    startObject o' (userObject g o' clo)
+    installGlobalObject g newName (userObject g clo)
     return (Symbol "object-created")
   Halt e1 -> do
     v <- eval g o env e1
@@ -110,8 +105,8 @@ applyClosure g o env clo arg = case clo of
   _ -> throw ApplyNonClosureError
 
 userObject ::
-  Global -> Object -> Value -> Value -> IO (ObjectCondition, Value)
-userObject g o clo arg =
+  Global -> Value -> Object -> Value -> IO (ObjectCondition, Value)
+userObject g clo o arg =
   applyClosure g o M.empty clo arg >>= \x -> return (ObjectNormal, x)
     `catches`
   [Handler (\(ex :: Error) -> return (ObjectError, fromError ex)),
