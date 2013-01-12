@@ -33,7 +33,8 @@ eval g o env expr = case expr of
   CaseExpr c -> return (Closure env c)
   Apply e1 e2 -> do
     arg <- eval g o env e2
-    applyValue g o env e1 arg
+    clo <- eval g o env e1
+    applyClosure g o env clo arg
   LetRec expr' env' -> eval g o (env `union` fmap Left env') expr'
   Maths op e1 e2 -> do
     arg1 <- eval g o env e1
@@ -102,7 +103,7 @@ applyValue g o env expr arg = do
   applyClosure g o env clo arg
 
 applyClosure :: Global -> Object -> Env -> Value -> Value -> IO Value
-applyClosure g o env clo arg = case arg of
+applyClosure g o env clo arg = case clo of
   Closure env' c -> case apply c arg of
     Just (env'', expr') -> eval g o (unions [env, env', env'']) expr'
     Nothing -> throw PatternMatchError
