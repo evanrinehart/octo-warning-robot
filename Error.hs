@@ -11,6 +11,7 @@ data Error =
   ApplyNonClosureError |
   ClosureMessageError |
   ClosureNameError |
+  HandlerNotClosureError |
   ObjectNotFoundError |
   ObjectExistsError |
   FreeVariableError deriving (Show, Typeable)  
@@ -28,3 +29,4 @@ errorSymbol e = case e of
   ObjectExistsError -> "object-exists"
   FreeVariableError -> "undefined-variable"
   ClosureNameError -> "closure-as-name"
+  HandlerNotClosureError -> "handler-not-closure"

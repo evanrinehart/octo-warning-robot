@@ -1,6 +1,9 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Value where
 
 import Data.Map
+import Data.Typeable
+
 import Expr
 import Case
 import Error
@@ -10,7 +13,7 @@ data Value =
   Symbol String |
   Number Integer |
   Tuple [Value] |
-  Closure Env (Case Expr) deriving (Show)
+  Closure Env (Case Expr) deriving (Show, Typeable)
 
 instance Eq Value where
   v1 == v2 = compare v1 v2 == EQ
@@ -19,6 +22,13 @@ instance Ord Value where
   compare v1 v2 = case safeCompareValues v1 v2 of
     Just ans -> ans
     Nothing -> error "can't compare closures"
+
+notClosure :: Value -> Bool
+notClosure (Closure _ _) = False
+notClosure _ = True
+
+isClosure :: Value -> Bool
+isClosure = not . notClosure
 
 fromError :: Error -> Value
 fromError = Symbol . errorSymbol

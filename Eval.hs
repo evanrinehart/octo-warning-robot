@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Eval where
 
 import Data.Map
@@ -16,6 +17,7 @@ import Global
 import Error
 import Apply
 import Math
+import Trap
 
 eval :: Global -> Object -> Env -> Expr -> IO Value
 eval g o env expr = case expr of
@@ -31,12 +33,7 @@ eval g o env expr = case expr of
   CaseExpr c -> return (Closure env c)
   Apply e1 e2 -> do
     arg <- eval g o env e2
-    arg0 <- eval g o env e1
-    case arg0 of
-      Closure env' c -> case apply c arg of
-        Just (env'', expr') -> eval g o (unions [env, env', env'']) expr'
-        Nothing -> throw PatternMatchError
-      _ -> throw ApplyNonClosureError
+    applyValue g o env e1 arg
   LetRec expr' env' -> eval g o (env `union` fmap Left env') expr'
   Maths op e1 e2 -> do
     arg1 <- eval g o env e1
@@ -55,58 +52,70 @@ eval g o env expr = case expr of
       resp <- takeMVar (response o)
       case resp of
         Right v' -> return v'
-        Left err -> eval g o env (Apply e3 (SymExpr (errorSymbol err))))
+        Left err -> applyValue g o env e3 err)
     (throw ObjectNotFoundError)
   Load e1 e2 -> do
-    arg1 <- eval g o env e1
-    case arg1 of
-      Closure _ _ -> throw ClosureNameError
-      field -> do
-        mo' <- objectLookup o field
-        case mo' of
-          Nothing -> eval g o env e2
-          Just v -> return v
+    field <- eval g o env e1
+    when (isClosure field) (throw ClosureNameError)
+    mo' <- objectLookup o field
+    case mo' of
+      Nothing -> eval g o env e2
+      Just v -> return v
   Store e1 e2 -> do
-    arg1 <- eval g o env e1
-    case arg1 of
-      Closure _ _ -> throw ClosureNameError
-      field -> do
-        arg2 <- eval g o env e2
-        objectStore o field arg2
-        return arg2
+    field <- eval g o env e1
+    when (isClosure field) (throw ClosureNameError)
+    arg <- eval g o env e2
+    objectStore o field arg
+    return arg
   Error e1 -> do
-    arg <- eval g o env e1
-    case arg of
-      Closure _ _ -> throw ClosureNameError
-      err -> error "error does not work"
+    err <- eval g o env e1
+    if isClosure err
+      then throw ClosureNameError
+      else throw (ErrorTrap err)
   Throw e1 e2 -> withObject g o env e1 e2
-    (\o' v -> do
+    (\o' err -> do
       thread <- readMVar (tid o')
-      --throwTo thread foo
-      error "throw does not work"
+      when (isClosure err) (throw ClosureNameError)
+      throwTo thread (AsyncTrap err)
       return (Tuple []))
     (throw ObjectNotFoundError)
   New e1 e2 -> do
-    arg2 <- eval g o env e2
-    arg1 <- eval g o env e1
-    o' <- case arg1 of
-      Closure _ _ -> throw ClosureNameError
-      newName -> modifyMVar g $ \m -> do
-        case M.lookup newName m of
-          Nothing -> do
-            o' <- return $ Object {
-              name = newName,
-              response = undefined,
-              fifo = undefined,
-              storage = undefined,
-              tid = undefined
-            }
-            return (M.insert newName o' m, o')
-          Just _ -> throw ObjectExistsError
-    --spawn thread here
+    clo <- eval g o env e2
+    newName <- eval g o env e1
+    when (notClosure clo) (throw HandlerNotClosureError)
+    when (isClosure newName) (throw ClosureNameError)
+    o' <- modifyMVar g $ \m -> case M.lookup newName m of
+      Nothing -> do
+        o' <- newEmptyObject newName
+        return (M.insert newName o' m, o')
+      Just _ -> throw ObjectExistsError
+    startObject o' $ \arg ->
+      fmap Right (applyClosure g o' M.empty clo arg) `catches` [
+        Handler (\(ex :: Error) -> return . Left . fromError $ ex),
+        Handler (
+          \(ex :: Trap Value) -> case ex of
+            HaltTrap v -> undefined
+            ErrorTrap v -> undefined
+            AsyncTrap v -> undefined
+        )
+      ]
     return (Symbol "object-created")
-  Halt e1 -> error "halt does not work"
+  Halt e1 -> do
+    v <- eval g o env e1
+    when (isClosure v) (throw ClosureNameError)
+    throw (HaltTrap v)
 
+applyValue :: Global -> Object -> Env -> Expr -> Value -> IO Value
+applyValue g o env expr arg = do
+  clo <- eval g o env expr
+  applyClosure g o env clo arg
+
+applyClosure :: Global -> Object -> Env -> Value -> Value -> IO Value
+applyClosure g o env clo arg = case arg of
+  Closure env' c -> case apply c arg of
+    Just (env'', expr') -> eval g o (unions [env, env', env'']) expr'
+    Nothing -> throw PatternMatchError
+  _ -> throw ApplyNonClosureError
 
 withObject g o env e1 e2 success failure = do
   arg0 <- eval g o env e1
