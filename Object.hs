@@ -4,6 +4,7 @@ import Control.Concurrent
 import Control.Concurrent.Chan
 import Data.Maybe
 import Data.Map
+import Control.Monad.Fix
 import Control.Monad
 import qualified Data.Map as M
 
@@ -18,6 +19,12 @@ data Object = Object {
   storage  :: MVar (Map Value Value),
   tid      :: MVar ThreadId
 }
+
+data ObjectCondition =
+  ObjectNormal |
+  ObjectError |
+  ObjectHalt
+    deriving (Show)
 
 objectLookup :: Object -> Value -> IO (Maybe Value)
 objectLookup o v = withMVar (storage o) (return . M.lookup v)
@@ -39,12 +46,24 @@ newEmptyObject newName = do
     tid = mv3
   }
 
-startObject :: Object -> (Value -> IO (Either Value Value)) -> IO ()
+startObject :: Object -> (Value -> IO (ObjectCondition, Value)) -> IO ()
 startObject o react = do
-  thread <- forkIO . forever $ do
+  thread <- forkIO . fix $ \loop -> do
     (arg, out) <- readChan (fifo o)
-    ans <- react arg
+    (cond, ans) <- react arg
     case out of
-      Just mv -> putMVar mv ans
+      Just mv -> case cond of
+        ObjectNormal -> putMVar mv (Right ans)
+        _ -> putMVar mv (Left ans)
       Nothing -> return ()
+    case cond of
+      ObjectNormal -> loop
+      ObjectError -> do
+        me <- myThreadId
+        print ans
+        killThread me
+      ObjectHalt -> do
+        thread <- myThreadId
+        putStrLn ("thread "++show thread++" ended normally")
+        return ()
   putMVar (tid o) thread

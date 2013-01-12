@@ -108,19 +108,18 @@ applyClosure g o env clo arg = case arg of
     Nothing -> throw PatternMatchError
   _ -> throw ApplyNonClosureError
 
-userObject :: Global -> Object -> Value -> Value -> IO (Either Value Value)
+userObject ::
+  Global -> Object -> Value -> Value -> IO (ObjectCondition, Value)
 userObject g o clo arg =
-  fmap Right (applyClosure g o M.empty clo arg)
+  applyClosure g o M.empty clo arg >>= \x -> return (ObjectNormal, x)
     `catches`
-  [
-    Handler (\(ex :: Error) -> return . Left . fromError $ ex),
-    Handler (
-      \(ex :: Trap Value) -> case ex of
-        HaltTrap v -> undefined
-        ErrorTrap v -> undefined
-        AsyncTrap v -> undefined
-    )
-  ]
+  [Handler (\(ex :: Error) -> return (ObjectError, fromError ex)),
+   Handler (
+     \(ex :: Trap Value) -> case ex of
+       HaltTrap v  -> return (ObjectHalt, v)
+       ErrorTrap v -> return (ObjectError, v)
+       AsyncTrap _ -> throw ex
+  )]
 
 withObject g o env e1 e2 success failure = do
   arg0 <- eval g o env e1
