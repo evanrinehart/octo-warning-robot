@@ -79,7 +79,12 @@ eval g o env expr = case expr of
     case arg of
       Closure _ _ -> throw ClosureErrorError
       err -> throw ErrorError
-  Throw e1 e2 -> undefined
+  Throw e1 e2 -> withObject g o env e1 e2
+    (\o' v -> do
+      thread <- readMVar (tid o')
+      throwTo thread AsyncError
+      return (Tuple []))
+    (throw ObjectNotFoundError)
   New e1 e2 -> undefined
   Halt e1 -> undefined
 

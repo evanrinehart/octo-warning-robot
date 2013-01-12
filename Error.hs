@@ -15,6 +15,7 @@ data Error =
   ClosureFieldError |
   ClosureErrorError |
   ErrorError |
+  AsyncError |
   FreeVariableError deriving (Show, Typeable)  
 
 instance Exception Error
@@ -32,3 +33,4 @@ errorSymbol e = case e of
   ClosureFieldError -> "closure-field-name"
   ClosureErrorError -> "closure-as-error"
   ErrorError -> "error"
+  AsyncError -> "asynchronous-error"
