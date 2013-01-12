@@ -89,16 +89,7 @@ eval g o env expr = case expr of
         o' <- newEmptyObject newName
         return (M.insert newName o' m, o')
       Just _ -> throw ObjectExistsError
-    startObject o' $ \arg ->
-      fmap Right (applyClosure g o' M.empty clo arg) `catches` [
-        Handler (\(ex :: Error) -> return . Left . fromError $ ex),
-        Handler (
-          \(ex :: Trap Value) -> case ex of
-            HaltTrap v -> undefined
-            ErrorTrap v -> undefined
-            AsyncTrap v -> undefined
-        )
-      ]
+    startObject o' (userObject g o' clo)
     return (Symbol "object-created")
   Halt e1 -> do
     v <- eval g o env e1
@@ -116,6 +107,20 @@ applyClosure g o env clo arg = case arg of
     Just (env'', expr') -> eval g o (unions [env, env', env'']) expr'
     Nothing -> throw PatternMatchError
   _ -> throw ApplyNonClosureError
+
+userObject :: Global -> Object -> Value -> Value -> IO (Either Value Value)
+userObject g o clo arg =
+  fmap Right (applyClosure g o M.empty clo arg)
+    `catches`
+  [
+    Handler (\(ex :: Error) -> return . Left . fromError $ ex),
+    Handler (
+      \(ex :: Trap Value) -> case ex of
+        HaltTrap v -> undefined
+        ErrorTrap v -> undefined
+        AsyncTrap v -> undefined
+    )
+  ]
 
 withObject g o env e1 e2 success failure = do
   arg0 <- eval g o env e1
