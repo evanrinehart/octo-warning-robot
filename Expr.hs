@@ -15,7 +15,7 @@ data Expr =
   Maths MathOp Expr Expr |
   Send Expr Expr |
   Request Expr Expr Expr |
-  Load Expr |
+  Load Expr Expr |
   Store Expr Expr |
   Error Expr |
   Throw Expr Expr |

@@ -18,3 +18,5 @@ data Object = Object {
   tid      :: MVar ThreadId
 }
 
+objectLookup :: Object -> Value -> IO (Maybe Value)
+objectLookup o v = withMVar (storage o) (return . M.lookup v)

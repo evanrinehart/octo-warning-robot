@@ -57,7 +57,15 @@ eval g o env expr = case expr of
         Right v' -> return v'
         Left err -> eval g o env (Apply e3 (SymExpr (errorSymbol err))))
     (throw ObjectNotFoundError)
-  Load e1 -> undefined
+  Load e1 e2 -> do
+    arg1 <- eval g o env e1
+    case arg1 of
+      Closure _ _ -> throw ClosureFieldError
+      field -> do
+        mo' <- objectLookup o field
+        case mo' of
+          Nothing -> eval g o env e2
+          Just v -> return v
   Store e1 e2 -> undefined
   Error e1 -> undefined
   Throw e1 e2 -> undefined
