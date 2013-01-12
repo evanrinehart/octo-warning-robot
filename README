@@ -21,6 +21,7 @@ cons      (a b c)
 case      case{1 -> a; 2 ->b}
 variable  $x
 apply     [$f x]
+math      [+ $x 1]
           case(x){x -> y; y -> x}
 letrec    letrec($x){$x = $y; $y = 3}
 do        do{$a = [$f x]; $b = [$g $a]; [$g $b]}
@@ -49,3 +50,8 @@ number   that is to say integers
 tuple    a vector of other values
 closure  a transformation from values to values
 
+math:
+Numbers have several binary arithmetic operations built in.
++ - * / % ^ do what you would expect.
+Division by zero causes an error.
+Also # compares non closure values, returning either GT LT or EQ.
