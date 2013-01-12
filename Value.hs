@@ -3,6 +3,7 @@ module Value where
 import Data.Map
 import Expr
 import Case
+import Error
 
 type Env = Map String (Either Expr Value)
 data Value =
@@ -18,6 +19,9 @@ instance Ord Value where
   compare v1 v2 = case safeCompareValues v1 v2 of
     Just ans -> ans
     Nothing -> error "can't compare closures"
+
+fromError :: Error -> Value
+fromError = Symbol . errorSymbol
 
 safeCompareValues = comp
 comp :: Value -> Value -> Maybe Ordering

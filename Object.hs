@@ -13,7 +13,7 @@ import Error
 data Object = Object {
   name     :: Value,
   response :: MVar (Either Error Value),
-  fifo     :: Chan (Value, Maybe (MVar Value)),
+  fifo     :: Chan (Value, Maybe (MVar (Either Error Value))),
   storage  :: MVar (Map Value Value),
   tid      :: MVar ThreadId
 }

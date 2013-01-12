@@ -44,39 +44,36 @@ eval g o env expr = case expr of
     case calc op arg1 arg2 of
       Left err -> throw err
       Right v -> return v
-  Send e1 e2 -> do
-    arg0 <- eval g o env e1
-    case arg0 of
-      Closure _ _ -> throw SendTargetError
-      target -> do
-        mo' <- lookupGlobal g target
-        case mo' of
-          Just o' -> do
-            arg <- eval g o env e2
-            case arg of
-              Closure _ _ -> throw ClosureMessageError
-              value -> do
-                writeChan (fifo o') (value, Nothing)
-                return (Symbol "delivered")
-          Nothing -> return (Symbol "nobody-there")
-  
+  Send e1 e2 -> withObject g o env e1 e2
+    (\o' v -> do
+      writeChan (fifo o') (v, Nothing)
+      return (Symbol "delivered"))
+    (return (Symbol "nobody-there"))
+  Request e1 e2 e3 -> withObject g o env e1 e2
+    (\o' v -> do
+      writeChan (fifo o') (v, Just (response o))
+      resp <- takeMVar (response o)
+      case resp of
+        Right v' -> return v'
+        Left err -> eval g o env (Apply e3 (SymExpr (errorSymbol err))))
+    (throw ObjectNotFoundError)
+  Load e1 -> undefined
+  Store e1 e2 -> undefined
+  Error e1 -> undefined
+  Throw e1 e2 -> undefined
+  New e1 e2 -> undefined
+  Halt e1 -> undefined
 
-
-{-
-  SymExpr String |
-  NumExpr Integer |
-  Variable String |
-  Cons [Expr] |
-  CaseExpr Case |
-  Apply Expr Expr |
-  LetRec Expr (Map String Expr) |
-  Maths MathOp Expr Expr |
-  Send Expr Expr |
-  Request Expr Expr Expr |
-  Load Expr |
-  Store Expr Expr |
-  Error Expr |
-  Throw Expr Expr |
-  New Expr Expr |
-  Halt Expr
--}
+withObject g o env e1 e2 success failure = do
+  arg0 <- eval g o env e1
+  case arg0 of
+    Closure _ _ -> throw SendTargetError
+    target -> do
+      mo' <- lookupGlobal g target
+      case mo' of
+        Just o' -> do
+          arg <- eval g o env e2
+          case arg of
+            Closure _ _ -> throw ClosureMessageError
+            value -> success o' value
+        Nothing -> failure
