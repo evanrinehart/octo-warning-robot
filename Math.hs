@@ -28,3 +28,13 @@ math Mod = mod
 math Pow = (^)
 math Cmp = error "math wrong (should be impossible)"
 
+fromChar :: Char -> MathOp
+fromChar c = case c of
+  '+' -> Add
+  '-' -> Sub
+  '*' -> Mul
+  '/' -> Div
+  '%' -> Mod
+  '^' -> Pow
+  '#' -> Cmp
+  _ -> error "invalid math operator"
