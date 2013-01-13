@@ -34,4 +34,3 @@ main = do
   case ans of
     Left err -> putStrLn ("MainMain: ERROR "++err)
     Right v -> putStrLn ("MainMain: exit value "++showValue v)
-  threadDelay 1000000
