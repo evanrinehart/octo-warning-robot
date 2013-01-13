@@ -6,7 +6,7 @@ a message, carry out a program to produce a response, and repeat.
 Each demon has a private, infinitely big notebook to write values in and
 read them later if necessary. During the course of a computation he
 might send a message to another object, perhaps waiting for a response
-before continuing. He can also self-destruct or cancel another demons
+before continuing. He can also self-destruct or cancel another demon's
 computation in progress via an asynchronous signal. Some demons behavior
 upon getting messages is undefined because they represent i/o or time
 in the real world (which does not in general behave in these ideal ways).
