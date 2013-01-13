@@ -117,11 +117,13 @@ defaultHandler = (CaseExpr . Case)
   [(PatVar "x", Error (Variable "x"))]
 
 consExpr :: Parser Expr
-consExpr = fmap Cons $ enclosedInSepBy
-  (char '(')
-  parseExpr
+consExpr = do
+  char '('
   skipSpaceNL
-  (char ')')
+  es <- sepBy parseExpr skipSpaceNL
+  skipSpaceNL
+  char ')'
+  return (Cons es)
 
 caseExpr :: Parser Expr
 caseExpr = do
@@ -263,21 +265,6 @@ validSymbolChar0 c = isAlpha c || c `elem` "!\"#%&'*./:<>?\\^_|~@"
 
 numberExpr :: Parser Integer
 numberExpr = signed decimal
-
-separatedPair :: Parser l -> Parser s -> Parser r -> Parser (l,r)
-separatedPair l s r = do
-  x <- l
-  s
-  y <- r
-  return (x,y)
-
-enclosedInSepBy ::
-  Parser l -> Parser a -> Parser s -> Parser r -> Parser [a]
-enclosedInSepBy l p s r = do
-  l
-  xs <- sepBy p s
-  r
-  return xs
 
 skipSpaceNL :: Parser ()
 skipSpaceNL = do
