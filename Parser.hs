@@ -121,17 +121,22 @@ consExpr = fmap Cons $ enclosedInSepBy
   (char ')')
 
 caseExpr :: Parser Expr
-caseExpr = fmap (CaseExpr . Case) $ enclosedInSepBy
-  (string "case{")
-  (caseElement)
-  (skipSpaceNL >> char ';' >> skipSpaceNL)
-  (char '}')
+caseExpr = do
+  string "case{"
+  skipSpaceNL
+  cases <- flip sepBy (skipSpaceNL >> char ';' >> skipSpaceNL) caseElement
+  skipSpaceNL
+  char '}'
+  return (CaseExpr (Case cases))
 
 caseElement :: Parser (Pattern, Expr)
-caseElement = separatedPair
-  pattern
-  (skipSpaceNL >> string "->" >> skipSpaceNL)
-  parseExpr
+caseElement = do
+  p <- pattern
+  skipSpaceNL
+  string "->"
+  skipSpaceNL
+  e <- parseExpr
+  return (p, e)
 
 pattern :: Parser Pattern
 pattern = choice
@@ -149,9 +154,11 @@ variable = do
 apply :: Parser Expr
 apply = do
   char '['
+  skipSpaceNL
   arg0 <- parseExpr
   skipSpaceNL
   arg1 <- parseExpr
+  skipSpaceNL
   char ']'
   return (Apply arg0 arg1)
 
