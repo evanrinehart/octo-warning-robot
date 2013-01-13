@@ -21,8 +21,8 @@ cons      (a b c)
 case      case{1 -> a; 2 ->b}
 variable  $x
 apply     [$f x]
-math      [+ $x 1]
           case(x){x -> y; y -> x}
+math      [+ $x 1]
 letrec    letrec($x){$x = $y; $y = 3}
 do        do{$a = [$f x]; $b = [$g $a]; [$g $b]}
 send      send{name, value}
