@@ -143,11 +143,18 @@ caseElement = do
 
 pattern :: Parser Pattern
 pattern = choice
-  [fmap PatSym symbol
+  [(char '_' >> return PatDontCare)
+  ,fmap PatSym symbol
   ,fmap PatNum numberExpr
   ,fmap PatVar variable
-  ,fmap PatTuple
-    (enclosedInSepBy (char '(') pattern skipSpaceNL (char ')'))]
+  ,fmap PatTuple $ do
+    char '('
+    skipSpaceNL
+    ps <- sepBy pattern skipSpaceNL
+    skipSpace
+    char ')'
+    return ps
+  ]
 
 variable :: Parser String
 variable = do
