@@ -5,13 +5,14 @@ import Data.Attoparsec
 import qualified Data.Attoparsec as A
 import Data.Attoparsec.ByteString.Char8
 import qualified Data.Attoparsec.ByteString.Char8 as C8
-import Data.ByteString hiding (elem)
-import Data.ByteString.UTF8
+import Data.ByteString hiding (elem, reverse, foldl, null)
+import Data.ByteString.UTF8 hiding (foldl)
 import Data.Char
 import Data.Char as C
 import Control.Monad
 import qualified Data.Map as M
 import Control.Applicative
+import Data.Maybe
 
 import Expr
 import Case
@@ -35,6 +36,7 @@ parseExpr = choice
   ,caseExpr
   ,fmap Variable variable
   ,apply
+  ,altApply
   ,mathExpr
   ,letrec
   ,send
@@ -45,6 +47,7 @@ parseExpr = choice
   ,errorExpr
   ,throwExpr
   ,new
+  ,doExpr
   ,fmap SymExpr symbol]
 
 send :: Parser Expr
@@ -161,6 +164,69 @@ apply = do
   skipSpaceNL
   char ']'
   return (Apply arg0 arg1)
+
+altApply :: Parser Expr
+altApply = do
+  string "case("
+  skipSpaceNL
+  e <- parseExpr
+  skipSpaceNL
+  string "){"
+  skipSpaceNL
+  cases <- flip sepBy (skipSpaceNL >> char ';' >> skipSpaceNL) caseElement
+  skipSpaceNL
+  char '}'
+  return (Apply (CaseExpr (Case cases)) e)
+
+doExpr :: Parser Expr
+doExpr = do
+  string "do{"
+  skipSpaceNL
+  stats <- flip sepBy (skipSpaceNL >> char ';' >> skipSpaceNL) $ do
+    v <- option Nothing $ do
+      v <- variable
+      skipSpaceNL
+      char '='
+      skipSpaceNL
+      return (Just v)
+    e <- parseExpr
+    return (v, e)
+  skipSpaceNL
+  char '}'
+  when (null stats) (fail "empty do")
+  let (_,e0):ss = reverse stats
+  return $ foldl
+    (\accum (v, e) ->
+      Apply
+        (CaseExpr (Case [(maybe PatDontCare PatVar v, accum)]))
+        e)
+    (Apply (CaseExpr (Case [(PatDontCare, e0)])) (NumExpr 0))
+    ss
+
+{-
+do{
+  $x = e1
+  $y = e2($x)
+  $z = e3($x,$y)
+       e4($x,$y,$z)
+}
+
+[case{$x -> [case{$y -> [case{$z -> [case{$x -> $x} e4]} e3]} e2]} e1]
+
+(_, e4)
+(z, e3)
+(y, e2)
+(x, e1)
+
+[case{$_ -> e4} 0]
+[case{$z -> [case{$_ -> e4} 0] e3]
+
+foldl :: (a -> b -> a) -> a -> [b] -> a
+foldr :: (b -> a -> a) -> a -> [b] -> a
+
+b = (v, e)
+a = Apply (CaseExpr (Case [(v, accum)])) e
+-}
 
 mathExpr :: Parser Expr
 mathExpr = do
