@@ -100,7 +100,7 @@ applyValue g o env expr arg = do
 applyClosure :: Global -> Object -> Env -> Value -> Value -> IO Value
 applyClosure g o env clo arg = case clo of
   Closure env' c -> case apply c arg of
-    Just (env'', expr') -> eval g o (unions [env, env', env'']) expr'
+    Just (env'', expr') -> eval g o (unions [env'', env', env]) expr'
     Nothing -> throw PatternMatchError
   _ -> throw ApplyNonClosureError
 
