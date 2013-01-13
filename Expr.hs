@@ -3,6 +3,7 @@ module Expr where
 import Data.Map
 
 import Case
+import MathOp
 
 data Expr =
   SymExpr String |
@@ -22,6 +23,3 @@ data Expr =
   New Expr Expr |
   Halt Expr
     deriving (Show)
-
-data MathOp = Add | Sub | Mul | Div | Mod | Pow | Cmp
-  deriving (Show)

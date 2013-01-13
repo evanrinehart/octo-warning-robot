@@ -14,7 +14,7 @@ import qualified Data.Map as M
 
 import Expr
 import Case
-import Math
+import MathOp
 
 parse :: ByteString -> Either String Expr
 parse input = parseOnly parser input
@@ -158,7 +158,7 @@ mathExpr :: Parser Expr
 mathExpr = do
   char '['
   skipSpace
-  op <- (fmap Math.fromChar . C8.satisfy . C8.inClass) "-+*/%^#"
+  op <- (fmap MathOp.fromChar . C8.satisfy . C8.inClass) "-+*/%^#"
   skipSpace
   arg1 <- parseExpr
   skipSpace

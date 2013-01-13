@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module Value where
 
-import Data.Map
+import Data.Map hiding (map)
 import Data.Typeable
 
 import Expr
@@ -22,6 +22,15 @@ instance Ord Value where
   compare v1 v2 = case safeCompareValues v1 v2 of
     Just ans -> ans
     Nothing -> error "can't compare closures"
+
+showValue :: Value -> String
+showValue (Symbol s) = s
+showValue (Number n) = show n
+showValue (Tuple xs) = "(" ++ (unwords . map showValue) xs ++ ")"
+showValue (Closure _ _) = "<<closure>>"
+
+emptyEnv :: Env
+emptyEnv = Data.Map.empty
 
 notClosure :: Value -> Bool
 notClosure (Closure _ _) = False
