@@ -11,6 +11,7 @@ import Data.Char
 import Data.Char as C
 import Control.Monad
 import qualified Data.Map as M
+import Control.Applicative
 
 import Expr
 import Case
@@ -21,9 +22,9 @@ parse input = parseOnly parser input
 
 parser :: Parser Expr
 parser = do
-  skipSpace
+  skipSpaceNL
   e <- parseExpr
-  skipSpace
+  skipSpaceNL
   endOfInput
   return e
 
@@ -49,33 +50,33 @@ parseExpr = choice
 send :: Parser Expr
 send = do
   string "send{"
-  skipSpace
+  skipSpaceNL
   arg0 <- parseExpr
-  skipSpace
+  skipSpaceNL
   char ','
-  skipSpace
+  skipSpaceNL
   arg1 <- parseExpr
-  skipSpace
+  skipSpaceNL
   char '}'
   return (Send arg0 arg1)
 
 request :: Parser Expr
 request = do
   string "request{"
-  skipSpace
+  skipSpaceNL
   arg0 <- parseExpr
-  skipSpace
+  skipSpaceNL
   char ','
-  skipSpace
+  skipSpaceNL
   arg1 <- parseExpr
-  skipSpace
+  skipSpaceNL
   handler <- option
     defaultHandler
     (do
       char ','
-      skipSpace
+      skipSpaceNL
       parseExpr)
-  skipSpace
+  skipSpaceNL
   char '}'
   return (Request arg0 arg1 handler)
 
@@ -89,22 +90,22 @@ new = commandPair "new" New
 command name constructor = do
   string name
   char '{'
-  skipSpace
+  skipSpaceNL
   arg <- parseExpr
-  skipSpace
+  skipSpaceNL
   char '}'
   return (constructor arg)
 
 commandPair name constructor = do
   string name
   char '{'
-  skipSpace
+  skipSpaceNL
   arg1 <- parseExpr
-  skipSpace
+  skipSpaceNL
   char ','
-  skipSpace
+  skipSpaceNL
   arg2 <- parseExpr
-  skipSpace
+  skipSpaceNL
   char '}'
   return (constructor arg1 arg2)
 
@@ -116,20 +117,20 @@ consExpr :: Parser Expr
 consExpr = fmap Cons $ enclosedInSepBy
   (char '(')
   parseExpr
-  skipSpace
+  skipSpaceNL
   (char ')')
 
 caseExpr :: Parser Expr
 caseExpr = fmap (CaseExpr . Case) $ enclosedInSepBy
   (string "case{")
   (caseElement)
-  (skipSpace >> char ';' >> skipSpace)
+  (skipSpaceNL >> char ';' >> skipSpaceNL)
   (char '}')
 
 caseElement :: Parser (Pattern, Expr)
 caseElement = separatedPair
   pattern
-  (skipSpace >> string "->" >> skipSpace)
+  (skipSpaceNL >> string "->" >> skipSpaceNL)
   parseExpr
 
 pattern :: Parser Pattern
@@ -138,7 +139,7 @@ pattern = choice
   ,fmap PatNum numberExpr
   ,fmap PatVar variable
   ,fmap PatTuple
-    (enclosedInSepBy (char '(') pattern skipSpace (char ')'))]
+    (enclosedInSepBy (char '(') pattern skipSpaceNL (char ')'))]
 
 variable :: Parser String
 variable = do
@@ -149,7 +150,7 @@ apply :: Parser Expr
 apply = do
   char '['
   arg0 <- parseExpr
-  skipSpace
+  skipSpaceNL
   arg1 <- parseExpr
   char ']'
   return (Apply arg0 arg1)
@@ -157,33 +158,34 @@ apply = do
 mathExpr :: Parser Expr
 mathExpr = do
   char '['
-  skipSpace
+  skipSpaceNL
   op <- (fmap MathOp.fromChar . C8.satisfy . C8.inClass) "-+*/%^#"
-  skipSpace
+  skipSpaceNL
   arg1 <- parseExpr
-  skipSpace
+  skipSpaceNL
   arg2 <- parseExpr
-  skipSpace
+  skipSpaceNL
   char ']'
   return (Maths op arg1 arg2)
 
 letrec :: Parser Expr
 letrec = do
   string "letrec("
-  skipSpace
-  e <- parseExpr
-  skipSpace
-  char ')'
-  defs <- enclosedInSepBy
-    (char '{')
-    (separatedPair
-      variable
-      (skipSpace >> char '=' >> skipSpace)
-      parseExpr
-    )
-    (skipSpace >> char ';' >> skipSpace)
-    (char '}')
-  return (LetRec e (M.fromList defs))
+  skipSpaceNL
+  mainExpr <- parseExpr
+  skipSpaceNL
+  string "){"
+  skipSpaceNL
+  defs <- flip sepBy (skipSpaceNL >> char ';' >> skipSpaceNL) $ do
+    v <- variable
+    skipSpaceNL
+    char '='
+    skipSpaceNL
+    e <- parseExpr
+    return (v, e)
+  skipSpaceNL
+  char '}'
+  return (LetRec mainExpr (M.fromList defs))
 
 symbol :: Parser String
 symbol = do
@@ -222,3 +224,7 @@ enclosedInSepBy l p s r = do
   r
   return xs
 
+skipSpaceNL :: Parser ()
+skipSpaceNL = do
+  C8.takeWhile C.isSpace
+  return ()
