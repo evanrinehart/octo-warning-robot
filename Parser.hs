@@ -203,31 +203,6 @@ doExpr = do
     (Apply (CaseExpr (Case [(PatDontCare, e0)])) (NumExpr 0))
     ss
 
-{-
-do{
-  $x = e1
-  $y = e2($x)
-  $z = e3($x,$y)
-       e4($x,$y,$z)
-}
-
-[case{$x -> [case{$y -> [case{$z -> [case{$x -> $x} e4]} e3]} e2]} e1]
-
-(_, e4)
-(z, e3)
-(y, e2)
-(x, e1)
-
-[case{$_ -> e4} 0]
-[case{$z -> [case{$_ -> e4} 0] e3]
-
-foldl :: (a -> b -> a) -> a -> [b] -> a
-foldr :: (b -> a -> a) -> a -> [b] -> a
-
-b = (v, e)
-a = Apply (CaseExpr (Case [(v, accum)])) e
--}
-
 mathExpr :: Parser Expr
 mathExpr = do
   char '['
