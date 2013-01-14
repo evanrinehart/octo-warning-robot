@@ -1,0 +1,12 @@
+YOU FORGOT SOMETHING IMPORTANT
+
+when an object self destructs due to 'halt'
+there is some cleanup to do
+
+first the object needs to be removed from the global directory
+
+second all its pending messages need to be handled so that those
+objects waiting for a response do not crash because 'waiting
+indefinitely on an mvar'
+
+simply write the halt value to each of the waiting output ports
