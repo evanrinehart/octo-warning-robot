@@ -10,6 +10,7 @@ import Global
 import Object
 import Parser
 import Eval
+import Case
 
 main :: IO ()
 main = do
@@ -25,12 +26,12 @@ main = do
     putStrLn ("STDOUT: " ++ (showValue arg))
     return (ObjectNormal, Symbol "null")
 
-  installGlobalObject g (Symbol "main") $ \obj _ -> do
-    ans <- eval g obj emptyEnv prog
-    return (ObjectNormal, ans)
+  let bootstrap = Closure M.empty (Case [(PatSym "run", prog)])
+
+  installGlobalObject g (Symbol "main") (userObject g bootstrap)
 
   port <- newEmptyMVar
   ans <- systemRequest g (Symbol "main") (Symbol "run") port
   case ans of
-    Left err -> putStrLn ("MainMain: ERROR "++err)
-    Right v -> putStrLn ("MainMain: exit value "++showValue v)
+    Left err -> putStrLn ("ERROR: "++err)
+    Right v -> putStrLn (showValue v)

@@ -60,11 +60,10 @@ startObject o react = do
       ObjectNormal -> loop
       ObjectError -> do
         me <- myThreadId
-        print ans
         killThread me
       ObjectHalt -> do
         thread <- myThreadId
-        putStrLn ("thread "++show thread++" ended normally")
+        putStrLn ((showValue (name o))++" ended normally.")
         return ()
   putMVar (tid o) thread
 

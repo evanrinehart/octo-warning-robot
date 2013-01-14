@@ -42,6 +42,6 @@ systemRequest g name arg port = do
       writeChan (fifo o) (arg, Just port)
       response <- takeMVar port
       case response of
-        Left err -> (return . Left . show) err
+        Left err -> (return . Left . showValue) err
         Right val -> return (Right val)
     Nothing -> return (Left "Object not found")

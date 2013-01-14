@@ -107,7 +107,7 @@ applyClosure g o env clo arg = case clo of
 userObject ::
   Global -> Value -> Object -> Value -> IO (ObjectCondition, Value)
 userObject g clo o arg =
-  applyClosure g o M.empty clo arg >>= \x -> return (ObjectNormal, x)
+  (applyClosure g o M.empty clo arg >>= \x -> return (ObjectNormal, x))
     `catches`
   [Handler (\(ex :: Error) -> return (ObjectError, fromError ex)),
    Handler (
