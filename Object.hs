@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Object where
 
 import Control.Concurrent
@@ -7,10 +8,12 @@ import Data.Map
 import Control.Monad.Fix
 import Control.Monad
 import qualified Data.Map as M
+import Control.Exception
 
 import Value
 import Expr
 import Error
+import Trap
 
 data Object = Object {
   name     :: Value,
@@ -50,7 +53,14 @@ startObject :: Object -> (Value -> IO (ObjectCondition, Value)) -> IO ()
 startObject o react = do
   thread <- forkIO . fix $ \loop -> do
     (arg, out) <- readChan (fifo o)
-    (cond, ans) <- react arg
+    (cond, ans) <- catches (react arg)
+      [Handler (\(ex :: Error) -> return (ObjectError, fromError ex)),
+       Handler (
+         \(ex :: Trap Value) -> case ex of
+            HaltTrap v  -> return (ObjectHalt, v)
+            ErrorTrap v -> return (ObjectError, v)
+            AsyncTrap _ -> throw ex
+      )]
     case out of
       Just mv -> case cond of
         ObjectNormal -> putMVar mv (Right ans)
