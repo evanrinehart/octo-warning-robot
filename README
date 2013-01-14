@@ -3,16 +3,21 @@ Object Oriented Programming Language
 Imagine objects as literally little demons carrying out computational
 tasks and sending messages to each other. Each demon will wait for
 a message, carry out a program to produce a response, and repeat.
+
+There are two kinds of demons, ones that can magically evaluate an expression
+via a special set of laws, and ones that interact with the outside world for
+the purposes of I/O and timekeeping. The first kind's behavior is completed
+defined as an application of some case expression to whatever message it happens
+to get. The second kind of demon cannot be defined as an expression and have
+generally undefined behavior.
+
 Each demon has a private, infinitely big notebook to write values in and
 read them later if necessary. During the course of a computation he
 might send a message to another object, perhaps waiting for a response
 before continuing. He can also self-destruct or cancel another demon's
-computation in progress via an asynchronous signal. Some demons behavior
-upon getting messages is undefined because they represent i/o or time
-in the real world (which does not in general behave in these ideal ways).
-Other demons are limited to basic computations like arithmetic and
-pattern matching, and so they are possible to program. This is the
-true form of "object oriented programming." : )
+computation in progress via an asynchronous signal.
+
+This is the true form of "object oriented programming." :)
 
 expressions:
 symbol    symbol
