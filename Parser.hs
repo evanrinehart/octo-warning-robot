@@ -18,9 +18,6 @@ import Expr
 import Case
 import MathOp
 
-parse :: ByteString -> Either String Expr
-parse input = parseOnly parser input
-
 parser :: Parser Expr
 parser = do
   skipSpaceNL
