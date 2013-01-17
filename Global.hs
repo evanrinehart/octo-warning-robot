@@ -45,3 +45,24 @@ systemRequest g name arg port = do
         Left err -> (return . Left . showValue) err
         Right val -> return (Right val)
     Nothing -> return (Left "Object not found")
+
+cleanupObject :: Global -> Object -> Value -> IO ()
+cleanupObject g obj v = modifyMVar_ g $ \mv -> do
+  writeChan (fifo obj) EndOfMessages
+  fix $ \process -> do
+    y <- readChan (fifo obj)
+    case y of
+      Message (_, Nothing) -> process
+      Message (_, Just port) -> do
+        putMVar port (Left v)
+        process
+      EndOfMessages -> return ()
+  return $ M.delete (name obj) g
+
+
+startObject :: Global -> Object -> (Value -> IO Value) -> IO ()
+startObject g o react = do
+  let cleanUp = cleanupObject g o
+  thread <- forkIO
+    (objectLoop o react cleanUp `finally` cleanUp (Symbol "fuck."))
+  putMVar (tid o) thread

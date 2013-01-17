@@ -18,7 +18,7 @@ import Trap
 data Object = Object {
   name     :: Value,
   response :: MVar (Either Value Value),
-  fifo     :: Chan (Value, Maybe (MVar (Either Value Value))),
+  fifo     :: Chan (Message Value Value),
   storage  :: MVar (Map Value Value),
   tid      :: MVar ThreadId
 }
@@ -28,6 +28,10 @@ data ObjectCondition =
   ObjectError |
   ObjectHalt
     deriving (Show)
+
+data Message a b =
+  Message (a, Maybe (MVar (Either b a))) |
+  EndOfMessages
 
 objectLookup :: Object -> Value -> IO (Maybe Value)
 objectLookup o v = withMVar (storage o) (return . M.lookup v)
@@ -49,32 +53,38 @@ newEmptyObject newName = do
     tid = mv3
   }
 
-startObject :: Object -> (Value -> IO (ObjectCondition, Value)) -> IO ()
-startObject o react = do
-  thread <- forkIO . fix $ \loop -> do
-    (arg, out) <- readChan (fifo o)
-    (cond, ans) <- catches (react arg)
-      [Handler (\(ex :: Error) -> return (ObjectError, fromError ex)),
-       Handler (
-         \(ex :: Trap Value) -> case ex of
-            HaltTrap v  -> return (ObjectHalt, v)
-            ErrorTrap v -> return (ObjectError, v)
-            AsyncTrap _ -> throw ex
-      )]
-    case out of
-      Just mv -> case cond of
-        ObjectNormal -> putMVar mv (Right ans)
-        _ -> putMVar mv (Left ans)
-      Nothing -> return ()
-    case cond of
-      ObjectNormal -> loop
-      ObjectError -> do
-        me <- myThreadId
-        killThread me
-      ObjectHalt -> do
-        thread <- myThreadId
-        putStrLn ((showValue (name o))++" ended normally.")
-        return ()
-  putMVar (tid o) thread
+objectLoop :: Object -> (Value -> IO Value) -> (Value -> IO ()) -> IO ()
+objectLoop o react cleanUp = do
+  (arg, out) <- fix $ \process -> do
+    y <- readChan (fifo o)
+    case y of
+      EndOfMessages -> process -- shouldnt happen
+      Just message  -> return message
+  let
+    loop = objectLoop o react
+    respondNormally result = case out of
+      Just port -> do
+        putMVar (Right result) port
+        loop
+      Nothing -> loop
+    handleError err = case out of
+      Just port ->
+        putMVar (Left err) port
+        loop
+      Nothing -> loop
+    halt v = case out of
+      Just port -> do
+        putMVar (Left v) port
+        cleanUp v
+      Nothing -> do
+        cleanUp v
 
+  (react arg >>= respondNormally) `catches`
+    [Handler (\(ex :: Error) -> handleError (fromError ex)),
+     Handler (
+       \(ex :: Trap Value) -> case ex of
+          HaltTrap v  -> halt v
+          ErrorTrap v -> handleError v
+          AsyncTrap v -> cleanUp v
+    )]
 
