@@ -4,12 +4,12 @@ Imagine objects as literally little demons carrying out computational
 tasks and sending messages to each other. Each demon will wait for
 a message, carry out a program to produce a response, and repeat.
 
-There are two kinds of demons, ones that can magically evaluate an expression
-via a special set of laws, and ones that interact with the outside world for
-the purposes of I/O and timekeeping. The first kind's behavior is completely
-defined as an application of some case expression to whatever message it happens
-to get. The second kind of demon cannot be defined as an expression and have
-generally undefined behavior.
+There are two kinds of demons, ones that can magically evaluate an
+expression via a special set of laws, and ones that interact with the
+outside world for the purposes of I/O and timekeeping. The first kind's
+behavior is completely defined as an application of some case expression
+to whatever message it happens to get. The second kind of demon cannot
+be defined as an expression and has generally undefined behavior.
 
 Each demon has a private, infinitely big notebook to write values in and
 read them later if necessary. During the course of a computation he
