@@ -17,21 +17,36 @@ import Trap
 
 data Object = Object {
   name     :: Value,
-  response :: MVar (Either Value Value),
-  fifo     :: Chan (Message Value Value),
+  response :: MVar (React a),
+  fifo     :: Chan (Message Value),
   storage  :: MVar (Map Value Value),
   tid      :: MVar ThreadId
 }
 
-data ObjectCondition =
-  ObjectNormal |
-  ObjectError |
-  ObjectHalt
-    deriving (Show)
+data React a =
+  Normal a |
+  SoftCrash a |
+  HardCrash a |
+  SelfDestruct a |
+  Terminated a
 
-data Message a b =
-  Message (a, Maybe (MVar (Either b a))) |
+data Message a =
+  Message (a, Maybe (MVar (React a))) |
   EndOfMessages
+
+-- NEXT abstract the request/response shit into its own data structure
+-- you need a Chan of messages with return MVars
+-- and you need a return mvar.
+-- methods include getting the next message (ignoring end of messages)
+-- getting all messages until END OF MESSAGES
+-- writing a result to a response port (ignoring Nothing)
+
+nextMessage :: Chan (Message a b) -> IO (a, Maybe (MVar (Either b a)))
+nextMessage ch = do
+  y <- readChan ch
+  case y of
+    EndOfMessages -> nextMessage ch
+    Message x -> return x
 
 objectLookup :: Object -> Value -> IO (Maybe Value)
 objectLookup o v = withMVar (storage o) (return . M.lookup v)
@@ -53,38 +68,51 @@ newEmptyObject newName = do
     tid = mv3
   }
 
-objectLoop :: Object -> (Value -> IO Value) -> (Value -> IO ()) -> IO ()
-objectLoop o react cleanUp = do
-  (arg, out) <- fix $ \process -> do
-    y <- readChan (fifo o)
-    case y of
-      EndOfMessages -> process -- shouldnt happen
-      Just message  -> return message
-  let
-    loop = objectLoop o react
-    respondNormally result = case out of
-      Just port -> do
-        putMVar (Right result) port
-        loop
-      Nothing -> loop
-    handleError err = case out of
-      Just port ->
-        putMVar (Left err) port
-        loop
-      Nothing -> loop
-    halt v = case out of
-      Just port -> do
-        putMVar (Left v) port
-        cleanUp v
-      Nothing -> do
-        cleanUp v
+whenJust :: Maybe a -> (a -> IO ()) -> IO ()
+whenJust Nothing _ = return ()
+whenJust (Just x) f = f x
 
-  (react arg >>= respondNormally) `catches`
-    [Handler (\(ex :: Error) -> handleError (fromError ex)),
+objectLoop ::
+  Global ->
+  Object ->
+  (Value -> IO (React Value)) ->
+  IO ()
+objectLoop g obj react = do
+  (arg, mport) <- nextMessage (fifo obj)
+  let
+    loop = objectLoop g obj react
+    out v = case mport of
+      Nothing -> return ()
+      Just port -> putMVar port v
+  y <- fmap Normal (react arg) `catches` objectCatches
+  case y of
+    Normal v -> out (Right v) >> loop
+    SoftCrash v -> out (Left v) >> loop
+    HardCrash v -> out (Left v) >> objectEnd g obj v
+    SelfDestruct v -> out (
+    
+
+objectStart :: Global -> Value -> (Value -> IO Value) -> IO ()
+objectStart g name react = modifyMVar_ g $ \gmap -> do
+  obj <- newEmptyObject name
+  gmap' <- if member name gmap
+    then throw ObjectExistsError
+    else return (insert name obj gmap)
+  forkIO $ objectLoop g obj react `finally` objectEnd g obj
+  return gmap'
+
+globalWrite g name obj
+
+objectEnd :: Global -> Object -> Value -> IO ()
+objectEnd
+
+objectCatches :: [Handler Value]
+objectCatches = [
+    [Handler (\(ex :: Error) -> HardCrash (fromError ex)),
      Handler (
        \(ex :: Trap Value) -> case ex of
-          HaltTrap v  -> halt v
-          ErrorTrap v -> handleError v
-          AsyncTrap v -> cleanUp v
+          HaltTrap v  -> SelfDestruct v
+          ErrorTrap v -> SoftCrash v
+          AsyncTrap v -> Terminated v
     )]
-
+]

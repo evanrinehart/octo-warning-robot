@@ -66,3 +66,13 @@ startObject g o react = do
   thread <- forkIO
     (objectLoop o react cleanUp `finally` cleanUp (Symbol "fuck."))
   putMVar (tid o) thread
+
+globalWrite :: Global -> Value -> Object -> IO Bool
+globalWrite g name obj = modifyMVar g w where
+  w m = if member name m
+    then return (m, False)
+    else return (insert name obj m, True)
+  
+
+globalClear :: Global -> Value -> IO ()
+globalClear g name = modifyMVar_ g (M.delete name)
