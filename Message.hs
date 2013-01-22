@@ -21,6 +21,12 @@ data MessagePipe = MessagePipe {
   callback :: MVar (React Value)
 }
 
+newMessagePipe :: IO MessagePipe
+newMessagePipe = do
+  mv <- newEmptyMVar
+  ch <- newChan
+  return (MessagePipe ch mv)
+
 send :: MessagePipe -> Value -> IO ()
 send mp arg = writeChan (pipe mp) (Message (arg, Nothing))
 
@@ -41,3 +47,20 @@ nextMessage mp = do
     Message (arg, mport) -> case mport of
       Nothing -> return (arg, const (return ()))
       Just port -> return (arg, putMVar port)
+
+messageDump ch = do
+  writeChan ch EndOfMessages
+  let isEndOfMessages x = case x of
+        EndOfMessages -> True
+        _ -> False
+  msgs <- readUntil ch isEndOfMessages []
+  return msgs
+
+readUntil :: Chan a -> (a -> Bool) -> [a] -> IO [a]
+readUntil ch done accum = do
+  y <- readChan ch
+  if done y
+    then return accum
+    else do
+      rest <- readUntil ch done accum
+      return (accum ++ rest)

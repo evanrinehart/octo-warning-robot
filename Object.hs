@@ -14,39 +14,14 @@ import Value
 import Expr
 import Error
 import Trap
+import Message
 
 data Object = Object {
   name     :: Value,
-  response :: MVar (React a),
-  fifo     :: Chan (Message Value),
+  io       :: MessagePipe,
   storage  :: MVar (Map Value Value),
   tid      :: MVar ThreadId
 }
-
-data React a =
-  Normal a |
-  SoftCrash a |
-  HardCrash a |
-  SelfDestruct a |
-  Terminated a
-
-data Message a =
-  Message (a, Maybe (MVar (React a))) |
-  EndOfMessages
-
--- NEXT abstract the request/response shit into its own data structure
--- you need a Chan of messages with return MVars
--- and you need a return mvar.
--- methods include getting the next message (ignoring end of messages)
--- getting all messages until END OF MESSAGES
--- writing a result to a response port (ignoring Nothing)
-
-nextMessage :: Chan (Message a b) -> IO (a, Maybe (MVar (Either b a)))
-nextMessage ch = do
-  y <- readChan ch
-  case y of
-    EndOfMessages -> nextMessage ch
-    Message x -> return x
 
 objectLookup :: Object -> Value -> IO (Maybe Value)
 objectLookup o v = withMVar (storage o) (return . M.lookup v)
@@ -59,18 +34,25 @@ newEmptyObject newName = do
   mv1 <- newEmptyMVar
   mv2 <- newMVar M.empty
   mv3 <- newEmptyMVar
+  mp  <- newMessagePipe
   chan <- newChan
   return $ Object {
     name = newName,
-    response = mv1,
-    fifo = chan,
+    io = mp,
     storage = mv2,
     tid = mv3
   }
 
-whenJust :: Maybe a -> (a -> IO ()) -> IO ()
-whenJust Nothing _ = return ()
-whenJust (Just x) f = f x
+objectStart :: Global -> Value -> (Value -> IO (React Value)) -> IO ()
+objectStart g name react = modifyMVar_ g $ \gmap -> do
+  obj <- newEmptyObject name
+  gmap' <- if member name gmap
+    then throw ObjectExistsError
+    else return (insert name obj gmap)
+  forkIO $ onException
+    (objectLoop g obj react)
+    (objectEnd g obj (Symbol "unknown-exception"))
+  return gmap'
 
 objectLoop ::
   Global ->
@@ -78,33 +60,61 @@ objectLoop ::
   (Value -> IO (React Value)) ->
   IO ()
 objectLoop g obj react = do
-  (arg, mport) <- nextMessage (fifo obj)
-  let
-    loop = objectLoop g obj react
-    out v = case mport of
-      Nothing -> return ()
-      Just port -> putMVar port v
-  y <- fmap Normal (react arg) `catches` objectCatches
+  let loop  = objectLoop g obj react
+  let die = objectEnd g obj
+  y <- bracketOnError
+    (nextMessage (io obj))
+    (\(_, out) -> out (HardCrash (Symbol "unexplained")))
+    (\(arg, out) -> mask $ \restore -> do
+      y <- restore (react arg) `catches` objectCatches
+      out y
+      return y)
   case y of
-    Normal v -> out (Right v) >> loop
-    SoftCrash v -> out (Left v) >> loop
-    HardCrash v -> out (Left v) >> objectEnd g obj v
-    SelfDestruct v -> out (
-    
+    Normal _       -> loop
+    SoftCrash _    -> loop
+    HardCrash v    -> die v
+    SelfDestruct v -> die v
+    Terminated v   -> die v
 
-objectStart :: Global -> Value -> (Value -> IO Value) -> IO ()
-objectStart g name react = modifyMVar_ g $ \gmap -> do
-  obj <- newEmptyObject name
-  gmap' <- if member name gmap
-    then throw ObjectExistsError
-    else return (insert name obj gmap)
-  forkIO $ objectLoop g obj react `finally` objectEnd g obj
-  return gmap'
+-- the above will not work.
+-- if an unknown (probably async) exception
+-- occurs in react, it will not be caught by objectCatches.
+-- the top level handler will run finally, but it will not respond
+-- to the waiting object (out)
 
+-- use a bracket to write unknown-exception to the output
+
+
+{- BLARG
+
+a demon is created and spends a period of time getting to the point where
+he is waiting on his chan for messages. before that occurs an asynch exception
+can occur, hell get kill, and nothing bad will happen.
+
+when waiting on the chan he can get an async exception, he will die and nothing
+bad will happen.
+
+immediately after getting a message and before putting the response we have
+danger of race condition.
+
+I. when a demon gets killed for any reason he must be removed from the global
+object directory
+
+II. when a demon gets killed for any reason all requests waiting for him need
+to be cancelled by responding to them.
+
+III. when a demon is in the process of handle a message and gets killed the
+message he is responding to must be cancelled by responding to it.
+
+-}
+  
 globalWrite g name obj
 
 objectEnd :: Global -> Object -> Value -> IO ()
-objectEnd
+objectEnd g obj v = modifyMVar_ g $ \gmap -> do
+  msgs <- messageDump (io obj)
+  forM_ msgs $ \(_, mport) -> respond mport v
+  return (M.delete (name obj) gmap)
 
 objectCatches :: [Handler Value]
 objectCatches = [
@@ -116,3 +126,4 @@ objectCatches = [
           AsyncTrap v -> Terminated v
     )]
 ]
+
