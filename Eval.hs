@@ -18,6 +18,7 @@ import Error
 import Apply
 import Math
 import Trap
+import Message
 
 eval :: Global -> Object -> Env -> Expr -> IO Value
 eval g o env expr = case expr of
@@ -44,17 +45,20 @@ eval g o env expr = case expr of
       Right v -> return v
   Send e1 e2 -> withObject g o env e1 e2
     (\o' v -> do
-      writeChan (fifo o') (v, Nothing)
+      send (io o') v
       return (Symbol "delivered"))
     (return (Symbol "nobody-there"))
-  Request e1 e2 e3 -> withObject g o env e1 e2
-    (\o' v -> do
-      writeChan (fifo o') (v, Just (response o))
-      resp <- takeMVar (response o)
-      case resp of
-        Right v' -> return v'
-        Left err -> applyValue g o env e3 err)
-    (throw ObjectNotFoundError)
+  Request e1 e2 e3 -> do
+    v  <- eval g o env e2
+    name  <- eval g o env e1
+    mo' <- lookupGlobal g name
+    case mo' of
+      Nothing -> throw ObjectNotFoundError
+      Just o' -> do
+        resp <- request (io o') v (io o)
+        case resp of
+          Normal v' -> return v'
+          _ -> undefined -- applyValue g o env e3 err
   Load e1 e2 -> do
     field <- eval g o env e1
     when (isClosure field) (throw ClosureNameError)
@@ -105,17 +109,8 @@ applyClosure g o env clo arg = case clo of
   _ -> throw ApplyNonClosureError
 
 userObject ::
-  Global -> Value -> Object -> Value -> IO (ObjectCondition, Value)
-userObject g clo o arg =
-  (applyClosure g o M.empty clo arg >>= \x -> return (ObjectNormal, x))
-    `catches`
-  [Handler (\(ex :: Error) -> return (ObjectError, fromError ex)),
-   Handler (
-     \(ex :: Trap Value) -> case ex of
-       HaltTrap v  -> return (ObjectHalt, v)
-       ErrorTrap v -> return (ObjectError, v)
-       AsyncTrap _ -> throw ex
-  )]
+  Global -> Value -> Object -> Value -> IO (React Value)
+userObject g clo o arg = fmap Normal $ applyClosure g o M.empty clo arg
 
 withObject g o env e1 e2 success failure = do
   arg0 <- eval g o env e1

@@ -2,8 +2,12 @@ module Message where
 
 import Control.Concurrent
 import Data.Maybe
+import Control.Exception
+import qualified Control.Exception as E
 
 import Value
+import Trap
+import Util
 
 data React a =
   Normal a |
@@ -14,7 +18,7 @@ data React a =
 
 data Message a =
   EndOfMessages |
-  Message (a, Maybe (MVar (React a)))
+  Message (a, React a -> IO ())
 
 data MessagePipe = MessagePipe {
   pipe :: Chan (Message Value),
@@ -28,25 +32,29 @@ newMessagePipe = do
   return (MessagePipe ch mv)
 
 send :: MessagePipe -> Value -> IO ()
-send mp arg = writeChan (pipe mp) (Message (arg, Nothing))
+send mp arg = writeChan (pipe mp) (Message (arg, doNothingWith))
 
 request :: MessagePipe -> Value -> MessagePipe -> IO (React Value)
 request them arg me = do
-  writeChan (pipe them) (Message (arg, Just (callback me)))
-  takeMVar (callback me)
+  let port = callback me
+  writeChan (pipe them) (Message (arg, putMVar port))
+  takeMVar port
 
 respond :: Maybe (MVar (React Value)) -> React Value -> IO ()
 respond Nothing _ = return ()
 respond (Just port) v = putMVar port v
 
-nextMessage :: MessagePipe -> IO (Value, React Value -> IO ())
-nextMessage mp = do
-  y <- readChan (pipe mp)
+nextMessage ::
+  MessagePipe ->
+  (Value -> IO ()) ->
+  IO (Value, React Value -> IO ())
+nextMessage mp die = do
+  y <- E.catch
+    (readChan (pipe mp))
+    (\ex@(AsyncTrap v) -> die v >> throw ex)
   case y of
-    EndOfMessages -> nextMessage mp
-    Message (arg, mport) -> case mport of
-      Nothing -> return (arg, const (return ()))
-      Just port -> return (arg, putMVar port)
+    EndOfMessages -> nextMessage mp die
+    Message (arg, out) -> return (arg, out)
 
 messageDump ch = do
   writeChan ch EndOfMessages
