@@ -58,7 +58,7 @@ eval g o env expr = case expr of
         resp <- request (io o') v (io o)
         case resp of
           Normal v' -> return v'
-          _ -> undefined -- applyValue g o env e3 err
+          problem -> applyValue g o env e3 (valueOf problem)
   Load e1 e2 -> do
     field <- eval g o env e1
     when (isClosure field) (throw ClosureNameError)

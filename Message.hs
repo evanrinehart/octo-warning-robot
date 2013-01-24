@@ -25,6 +25,14 @@ data MessagePipe = MessagePipe {
   callback :: MVar (React Value)
 }
 
+valueOf :: React Value -> Value
+valueOf r = case r of
+  Normal v -> v
+  SoftCrash v -> v
+  HardCrash v -> v
+  SelfDestruct v -> v
+  Terminated v -> v
+
 newMessagePipe :: IO MessagePipe
 newMessagePipe = do
   mv <- newEmptyMVar
