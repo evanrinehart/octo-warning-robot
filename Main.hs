@@ -33,7 +33,7 @@ main = do
       Normal v -> do
         putStrLn ("==> " ++ showValue v)
         putStrLn ""
-      _ -> do
-        putStrLn ("ERROR:")
+      problem -> do
+        putStrLn ("ERROR:" ++ (showValue . valueOf) problem)
         putStrLn ""
 
