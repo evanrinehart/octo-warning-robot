@@ -1,12 +1,19 @@
 YOU FORGOT SOMETHING IMPORTANT
 
-when an object self destructs due to 'halt'
-there is some cleanup to do
+when an object is self destructing, it needs to respond to all
+pending messages with the error value.
 
-first the object needs to be removed from the global directory
+you are now doing this, but there is a race condition!
 
-second all its pending messages need to be handled so that those
-objects waiting for a response do not crash because 'waiting
-indefinitely on an mvar'
+after you are removed from the global directory, some object
+may still be about to send you a message. before that you may
+write EndOfMessages to your chan. Then at some point the
+sender will write a message AFTER that. And it will never be
+processed.
 
-simply write the halt value to each of the waiting output ports
+To fix this, the sender must lookup and write his message while
+holding the global object directory. after the message is written
+he can put the global dir back.
+
+of course the destructing object needs to hold the global dir
+while handling all pending messages, but youre already doing that.
