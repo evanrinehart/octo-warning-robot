@@ -33,6 +33,14 @@ valueOf r = case r of
   SelfDestruct v -> v
   Terminated v -> v
 
+promptOf :: React Value -> String
+promptOf r = case r of
+  Normal _ -> "==> "
+  SoftCrash _ -> "ERROR: "
+  HardCrash _ -> "ERROR: "
+  SelfDestruct _ -> "Object disappeared leaving value: "
+  Terminated _ -> "Object interrupted with value: "
+
 newMessagePipe :: IO MessagePipe
 newMessagePipe = do
   mv <- newEmptyMVar

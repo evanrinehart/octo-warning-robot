@@ -33,7 +33,9 @@ main = do
       Normal v -> do
         putStrLn ("==> " ++ showValue v)
         putStrLn ""
+      SelfDestruct v -> do
+        putStrLn (promptOf (SelfDestruct v) ++ showValue v)
+        exitSuccess
       problem -> do
-        putStrLn ("ERROR:" ++ (showValue . valueOf) problem)
+        putStrLn (promptOf problem ++ (showValue . valueOf) problem)
         putStrLn ""
-
