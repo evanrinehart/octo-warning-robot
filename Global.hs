@@ -1,7 +1,6 @@
 module Global where
 
-import Control.Concurrent.MVar
-import Control.Concurrent.Chan
+import Control.Concurrent
 import Control.Exception
 import Data.Map
 import qualified Data.Map as M
@@ -9,8 +8,7 @@ import qualified Data.Map as M
 import Value
 import Object
 import Error
-
-type Global = MVar (Map Value Object)
+import Message
 
 newEmptyGlobal :: IO Global
 newEmptyGlobal = newMVar M.empty
@@ -21,7 +19,7 @@ lookupGlobal g v = withMVar g (return . M.lookup v)
 installGlobalObject ::
   Global ->
   Value ->
-  (Object -> Value -> IO (ObjectCondition, Value)) ->
+  (Object -> Value -> IO (React Value)) ->
   IO ()
 installGlobalObject g newName react = do
   o <- modifyMVar g $ \m -> case M.lookup newName m of
@@ -29,19 +27,31 @@ installGlobalObject g newName react = do
       o' <- newEmptyObject newName
       return (M.insert newName o' m, o')
     Just _ -> throw ObjectExistsError
-  startObject o (react o)
+  startObject g o (react o)
 
 systemRequest ::
   Global -> Value -> Value ->
-  MVar (Either Value Value) ->
-  IO (Either String Value)
+  MVar (React Value) ->
+  IO (React Value)
 systemRequest g name arg port = do
   mo <- lookupGlobal g name
   case mo of
     Just o -> do
-      writeChan (fifo o) (arg, Just port)
-      response <- takeMVar port
-      case response of
-        Left err -> (return . Left . showValue) err
-        Right val -> return (Right val)
-    Nothing -> return (Left "Object not found")
+      let port = callback (io o)
+      writeChan (pipe (io o)) (Message (arg, putMVar port))
+      takeMVar port
+    Nothing -> return undefined
+
+startObject :: Global -> Object -> (Value -> IO (React Value)) -> IO ()
+startObject g o react = do
+  threadId <- forkIOWithUnmask (objectLoop g o react)
+  putMVar (tid o) threadId
+
+globalWrite :: Global -> Value -> Object -> IO Bool
+globalWrite g name obj = modifyMVar g w where
+  w m = if member name m
+    then return (m, False)
+    else return (insert name obj m, True)
+
+globalClear :: Global -> Value -> IO ()
+globalClear g name = modifyMVar_ g (return . M.delete name)

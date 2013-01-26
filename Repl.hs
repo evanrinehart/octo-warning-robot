@@ -17,6 +17,7 @@ import Eval
 import Expr
 import Error
 import Trap
+import Message
 
 
 repl :: (Expr -> IO ()) -> IO ()
@@ -58,16 +59,8 @@ readExpr r = case r of
 
 
 replObject ::
-  Global -> MVar Value -> Object -> Value -> IO (ObjectCondition, Value)
-replObject g loader o arg =
-  (do
+  Global -> MVar Value -> Object -> Value -> IO (React Value)
+replObject g loader o arg = do
     clo <- takeMVar loader
     x <- applyClosure g o emptyEnv clo arg
-    return (ObjectNormal, x)) `catches`
-  [Handler (\(ex :: Error) -> return (ObjectError, fromError ex)),
-   Handler (
-     \(ex :: Trap Value) -> case ex of
-       HaltTrap v  -> return (ObjectHalt, v)
-       ErrorTrap v -> return (ObjectError, v)
-       AsyncTrap _ -> throw ex
-  )]
+    return (Normal x)

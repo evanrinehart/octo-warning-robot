@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, Rank2Types #-}
 module Object where
 
 import Control.Concurrent
@@ -14,20 +14,16 @@ import Value
 import Expr
 import Error
 import Trap
+import Message
 
 data Object = Object {
   name     :: Value,
-  response :: MVar (Either Value Value),
-  fifo     :: Chan (Value, Maybe (MVar (Either Value Value))),
+  io       :: MessagePipe,
   storage  :: MVar (Map Value Value),
   tid      :: MVar ThreadId
 }
 
-data ObjectCondition =
-  ObjectNormal |
-  ObjectError |
-  ObjectHalt
-    deriving (Show)
+type Global = MVar (Map Value Object)
 
 objectLookup :: Object -> Value -> IO (Maybe Value)
 objectLookup o v = withMVar (storage o) (return . M.lookup v)
@@ -40,41 +36,45 @@ newEmptyObject newName = do
   mv1 <- newEmptyMVar
   mv2 <- newMVar M.empty
   mv3 <- newEmptyMVar
+  mp  <- newMessagePipe
   chan <- newChan
   return $ Object {
     name = newName,
-    response = mv1,
-    fifo = chan,
+    io = mp,
     storage = mv2,
     tid = mv3
   }
 
-startObject :: Object -> (Value -> IO (ObjectCondition, Value)) -> IO ()
-startObject o react = do
-  thread <- forkIO . fix $ \loop -> do
-    (arg, out) <- readChan (fifo o)
-    (cond, ans) <- catches (react arg)
-      [Handler (\(ex :: Error) -> return (ObjectError, fromError ex)),
-       Handler (
-         \(ex :: Trap Value) -> case ex of
-            HaltTrap v  -> return (ObjectHalt, v)
-            ErrorTrap v -> return (ObjectError, v)
-            AsyncTrap _ -> throw ex
-      )]
-    case out of
-      Just mv -> case cond of
-        ObjectNormal -> putMVar mv (Right ans)
-        _ -> putMVar mv (Left ans)
-      Nothing -> return ()
-    case cond of
-      ObjectNormal -> loop
-      ObjectError -> do
-        me <- myThreadId
-        killThread me
-      ObjectHalt -> do
-        thread <- myThreadId
-        putStrLn ((showValue (name o))++" ended normally.")
-        return ()
-  putMVar (tid o) thread
 
+objectLoop ::
+  Global ->
+  Object ->
+  (Value -> IO (React Value)) ->
+  (forall a. IO a -> IO a) ->
+  IO ()
+objectLoop g obj react unmask = do
+  let loop = objectLoop g obj react unmask
+  let die = objectEnd g obj
+  (arg, out) <- nextMessage (io obj) die
+  y <- unmask (react arg) `catches` objectCatches
+  out y
+  case y of
+    Normal _       -> loop
+    SoftCrash _    -> loop
+    HardCrash v    -> die v
+    SelfDestruct v -> die v
+    Terminated v   -> die v
+
+objectEnd :: Global -> Object -> Value -> IO ()
+objectEnd g obj v = return () --modifyMVar_ g $ \gmap -> do
+  --msgs <- messageDump (io obj)
+  --forM_ msgs $ \(_, mport) -> respond mport v
+  --return (M.delete (name obj) gmap)
+
+objectCatches :: [Handler (React Value)]
+objectCatches =
+  [Handler (\(ex :: Error) -> (return . SoftCrash . fromError) ex),
+   Handler (\(HaltTrap v) -> return (SelfDestruct v)),
+   Handler (\(ErrorTrap v)-> return (SoftCrash v)),
+   Handler (\(AsyncTrap v) -> return (Terminated v))]
 

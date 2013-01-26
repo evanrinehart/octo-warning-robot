@@ -12,6 +12,7 @@ import Parser
 import Eval
 import Case
 import Repl
+import Message
 
 main :: IO ()
 main = do
@@ -19,7 +20,7 @@ main = do
 
   installGlobalObject g (Symbol "stdout") $ \obj arg -> do
     putStrLn ("STDOUT: " ++ (showValue arg))
-    return (ObjectNormal, Symbol "null")
+    (return . Normal . Symbol) "null"
 
   loader <- newEmptyMVar
   installGlobalObject g (Symbol "main") (replObject g loader)
@@ -29,10 +30,12 @@ main = do
     putMVar loader (Closure emptyEnv (Case [(PatSym "run", expr)]))
     ans <- systemRequest g (Symbol "main") (Symbol "run") port
     case ans of
-      Left err -> do
-        putStrLn ("ERROR: "++err)
-        putStrLn ""
-      Right v -> do
+      Normal v -> do
         putStrLn ("==> " ++ showValue v)
         putStrLn ""
-
+      SelfDestruct v -> do
+        putStrLn (promptOf (SelfDestruct v) ++ showValue v)
+        exitSuccess
+      problem -> do
+        putStrLn (promptOf problem ++ (showValue . valueOf) problem)
+        putStrLn ""
