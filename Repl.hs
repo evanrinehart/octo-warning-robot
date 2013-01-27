@@ -8,6 +8,7 @@ import System.Console.Readline
 import Data.Attoparsec
 import System.Exit
 import Control.Exception
+import Data.Monoid
 
 import Parser
 import Global
@@ -22,10 +23,10 @@ import Message
 
 repl :: (Expr -> IO ()) -> IO ()
 repl exec = do
-  l <- fmap (fmap fromString) $ readline ">> "
+  l <- fmap (fmap fromString) $ readline "?? "
   l <- case l of
     Nothing -> putStrLn "\nexit" >> exitSuccess
-    Just l -> return l
+    Just l -> return (l <> " ")
   let
     r = case parse parser l of
       f@(Fail _ _ _) -> f
@@ -44,10 +45,10 @@ readExpr :: Result Expr -> IO (Either (String,String) Expr)
 readExpr r = case r of
   Fail _ cs m -> return (Left (unlines cs, m))
   Partial cont -> do
-    ml <- fmap (fmap fromString) $ readline ".> "
+    ml <- fmap (fmap fromString) $ readline ".. "
     l <- case ml of
       Nothing -> putStrLn "\nexit" >> exitSuccess
-      Just l -> return l
+      Just l -> return (l <> " ")
     let
       r' = case feed r l of
         f@(Fail _ _ _) -> f

@@ -31,7 +31,7 @@ main = do
     ans <- systemRequest g (Symbol "main") (Symbol "run") port
     case ans of
       Normal v -> do
-        putStrLn ("==> " ++ showValue v)
+        putStrLn (">> " ++ showValue v)
         putStrLn ""
       SelfDestruct v -> do
         putStrLn (promptOf (SelfDestruct v) ++ showValue v)
