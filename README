@@ -23,7 +23,7 @@ expressions:
 symbol    symbol
 number    1234
 cons      (a b c)
-case      case{1 -> a; 2 ->b}
+case      case{1 -> a; 2 -> b}
 variable  $x
 apply     [$f x]
           case(x){x -> y; y -> x}
